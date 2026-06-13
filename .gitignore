@@ -40,3 +40,12 @@ runs/
 logs/
 wandb/
 checkpoints/
+
+# ── Raw data & text corpora ────────────────────────────────────────────────────
+data/raw/
+data/processed/
+*.txt
+*.csv
+*.json
+*.jsonl
+*.parquet
