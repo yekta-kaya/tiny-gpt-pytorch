@@ -1,0 +1,42 @@
+# Virtual environment
+llm_experiments/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ML / experiment artifacts
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+runs/
+logs/
+wandb/
+checkpoints/
