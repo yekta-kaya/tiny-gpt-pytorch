@@ -2,6 +2,8 @@ import re
 import requests
 import torch
 from bs4 import BeautifulSoup
+import re
+from collections import Counter
 
 
 def fetch_wikipedia_text(urls, verbose=True):
@@ -146,28 +148,44 @@ def gather_data(
     return combined
 
 
-def format_data(text, seq_len=64):
+
+def format_data(text, seq_len=64, min_freq=3):
+    # ── 1. lowercase + normalize whitespace ──────────────────────
     text = text.lower()
     text = text.replace("\n", " ")
-    text = text.replace(".", " .")
-    text = text.replace(",", " ,")
+
+    # ── 2. strip/separate punctuation properly ───────────────────
+    # separate . , ! ? ; : from words so "dog." → "dog ."
+    text = re.sub(r"([.,!?;:])", r" \1 ", text)
+    # remove everything else that isn't a letter, digit, or kept punctuation
+    text = re.sub(r"[^a-z0-9.,!?;: ]", " ", text)
+    # collapse multiple spaces
     text = " ".join(text.split())
 
     tokens = text.split()
+
+    # ── 3. frequency cutoff — drop words seen fewer than min_freq times ──
+    counts = Counter(tokens)
+    tokens = [t if counts[t] >= min_freq else "<unk>" for t in tokens]
+
+    # ── 4. build vocab ───────────────────────────────────────────
     vocab = sorted(set(tokens))
-    stoi = {w: i for i, w in enumerate(vocab)}
-    itos = {i: w for w, i in stoi.items()}
+    stoi  = {w: i for i, w in enumerate(vocab)}
+    itos  = {i: w for w, i in stoi.items()}
 
-    encoded = [stoi[w] for w in tokens]
+    encoded = [stoi[t] for t in tokens]
 
+    # ── 5. sequences ─────────────────────────────────────────────
     inputs, targets = [], []
     for i in range(len(encoded) - seq_len):
-        inputs.append(encoded[i : i + seq_len])
-        targets.append(encoded[i + 1 : i + seq_len + 1])
+        inputs.append(encoded[i     : i + seq_len])
+        targets.append(encoded[i + 1: i + seq_len + 1])
 
     input_ids  = torch.tensor(inputs,  dtype=torch.long)
     target_ids = torch.tensor(targets, dtype=torch.long)
 
     print(f"Vocab size : {len(vocab):,}")
     print(f"Sequences  : {len(inputs):,}  (seq_len={seq_len})")
+    print(f"<unk> rate : {tokens.count('<unk>') / len(tokens) * 100:.2f}%")
+
     return input_ids, target_ids, vocab, stoi, itos
