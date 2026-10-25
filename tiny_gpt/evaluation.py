@@ -104,13 +104,14 @@ def evaluate_lm(model, val_input_ids, val_target_ids, vocab, train_target_ids=No
     # uniform: a model that knows NOTHING, guesses every word equally
     uniform_loss = math.log(vocab_size)
 
-    # unigram: a model that knows word FREQUENCIES but ignores context
+    # unigram: a model that knows word FREQUENCIES but ignores context.
+    # Fit on train, scored on val exactly like the real model. Add-one smoothing
+    # keeps tokens that never appear in train from giving log(0).
     unigram_loss = None
     if train_target_ids is not None:
-        counts = torch.bincount(train_target_ids.reshape(-1), minlength=vocab_size).float()
-        probs  = counts / counts.sum()
-        probs  = probs[probs > 0]
-        unigram_loss = -(probs * probs.log()).sum().item()
+        counts    = torch.bincount(train_target_ids.reshape(-1).cpu(), minlength=vocab_size).float() + 1
+        log_probs = (counts / counts.sum()).log()
+        unigram_loss = -log_probs[val_target_ids.reshape(-1).cpu()].mean().item()
 
     # ── 3. convert everything to perplexity ──────────────────────────
     # perplexity = exp(loss). It answers: "on average, how many words is the

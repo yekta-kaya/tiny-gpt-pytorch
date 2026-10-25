@@ -2,39 +2,54 @@ import re
 from collections import Counter
 from pathlib import Path
 import time
+from urllib.parse import unquote
 
 import requests
 import torch
-from bs4 import BeautifulSoup
+
+
+# Wikimedia and Gutenberg both ask bots to identify themselves honestly
+_USER_AGENT = "tiny-gpt/0.1 (educational project; https://github.com/yekta-kaya/tiny-gpt-pytorch)"
+
+_WIKI_API = "https://en.wikipedia.org/w/api.php"
+_WIKI_TAIL_SECTIONS = re.compile(
+    r"\n==\s*(See also|References|Notes|Citations|Sources|Further reading|External links)\s*==",
+    re.IGNORECASE,
+)
 
 
 def fetch_wikipedia_text(urls, verbose=True):
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; LLMExperiments/1.0)"}
+    # MediaWiki API instead of scraping article HTML: it's what Wikimedia's
+    # robot policy asks for, and it doesn't get rate-limited with 403s.
+    headers = {"User-Agent": _USER_AGENT}
     all_texts = []
 
     for url in urls:
+        title = unquote(url.rsplit("/wiki/", 1)[-1])
         try:
-            response = requests.get(url, headers=headers, timeout=20)
+            response = requests.get(_WIKI_API, headers=headers, timeout=20, params={
+                "action": "query", "prop": "extracts", "explaintext": 1, "redirects": 1,
+                "titles": title, "format": "json", "formatversion": 2,
+            })
             response.raise_for_status()
+            page_text = response.json()["query"]["pages"][0].get("extract")
+            if not page_text:
+                raise ValueError("page not found")
 
-            if verbose:
-                print(f"Fetched: {url}")
-
-            soup = BeautifulSoup(response.text, "html.parser")
-            content = soup.find("div", {"id": "mw-content-text"})
-            paragraphs = (content or soup).find_all("p")
-            paragraphs = [p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)]
-
-            if verbose:
-                print(f"  Paragraphs: {len(paragraphs)}")
-
-            page_text = " ".join(paragraphs)
+            # drop reference/link sections at the end, then the "== Heading ==" lines
+            tail = _WIKI_TAIL_SECTIONS.search(page_text)
+            if tail:
+                page_text = page_text[:tail.start()]
+            page_text = re.sub(r"^=+.*=+\s*$", "", page_text, flags=re.MULTILINE)
             page_text = " ".join(page_text.split())
             all_texts.append(page_text)
 
+            if verbose:
+                print(f"Fetched: {title} ({len(page_text):,} chars)")
+
         except Exception as e:
             print(f"  Failed {url}: {e}")
-        time.sleep(2)
+        time.sleep(1)
     return " ".join(all_texts)
 
 
@@ -46,7 +61,7 @@ _GUTENBERG_URL_TEMPLATES = [
 
 
 def fetch_gutenberg_text(book_ids, verbose=True):
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; LLMExperiments/1.0)"}
+    headers = {"User-Agent": _USER_AGENT}
     all_texts = []
 
     for book_id in book_ids:
@@ -79,6 +94,7 @@ def fetch_gutenberg_text(book_ids, verbose=True):
 
         if not fetched:
             print(f"  Failed Gutenberg #{book_id}: could not retrieve from any URL")
+        time.sleep(2)
 
     return " ".join(all_texts)
 
@@ -151,7 +167,12 @@ def gather_data(
 
 
 
-def format_data(text, seq_len=64, min_freq=3):
+def format_data(text, seq_len=64, min_freq=3, stride=None):
+    # stride = gap between window starts. Defaults to seq_len (no overlap):
+    # stride=1 puts every token in seq_len windows, so one "epoch" is really
+    # ~seq_len passes over the corpus and the model overfits within an epoch.
+    stride = stride or seq_len
+
     # ── 1. lowercase + normalize whitespace ──────────────────────
     text = text.lower()
     text = text.replace("\n", " ")
@@ -179,7 +200,7 @@ def format_data(text, seq_len=64, min_freq=3):
 
     # ── 5. sequences ─────────────────────────────────────────────
     inputs, targets = [], []
-    for i in range(len(encoded) - seq_len):
+    for i in range(0, len(encoded) - seq_len, stride):
         inputs.append(encoded[i     : i + seq_len])
         targets.append(encoded[i + 1: i + seq_len + 1])
 
@@ -187,10 +208,21 @@ def format_data(text, seq_len=64, min_freq=3):
     target_ids = torch.tensor(targets, dtype=torch.long)
 
     print(f"Vocab size : {len(vocab):,}")
-    print(f"Sequences  : {len(inputs):,}  (seq_len={seq_len})")
+    print(f"Sequences  : {len(inputs):,}  (seq_len={seq_len}, stride={stride})")
     print(f"<unk> rate : {tokens.count('<unk>') / len(tokens) * 100:.2f}%")
 
     return input_ids, target_ids, vocab, stoi, itos
+
+
+def train_val_split(input_ids, target_ids, val_frac=0.1, seed=42):
+    # Random split over windows so val covers every source, not just whichever
+    # book happens to come last. Only valid with non-overlapping windows
+    # (stride >= seq_len); with overlap, val windows would repeat train text.
+    gen  = torch.Generator().manual_seed(seed)
+    perm = torch.randperm(input_ids.size(0), generator=gen)
+    n_val = int(val_frac * input_ids.size(0))
+    val_idx, train_idx = perm[:n_val], perm[n_val:]
+    return input_ids[train_idx], target_ids[train_idx], input_ids[val_idx], target_ids[val_idx]
 
 
 if __name__ == "__main__":

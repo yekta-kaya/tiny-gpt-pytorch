@@ -19,19 +19,29 @@ notebooks/
 tests/
   test_model.py          shape/weight-tying/causal-masking checks for TinyGPT
 
-data/                  local corpora (gitignored — see below)
+data/                  local corpora (gitignored)
 checkpoints/           saved model weights (gitignored)
 ```
 
-## Data
+## Results
 
-`data/` isn't committed — it's gitignored, same as `checkpoints/`. Generate your own corpus by running:
+Trained on ~600K word-level tokens from 23 Wikipedia articles and 7 public-domain Project Gutenberg books (dogs, wolves and other animals). The text is cut into non-overlapping 64-token windows and split 90/10 at random into train/validation.
 
-```bash
-uv run python scripts/prepare_data.py
-```
+**Model:** 4 decoder blocks, 4 attention heads, `d_model=128`, FFN 512, context 64 tokens, vocabulary 11,966 words, ~2.3M parameters (embedding and output layer share weights).
 
-This scrapes the default set of Wikipedia pages and Gutenberg books and writes `data/dog_corpus.txt`. Edit the `_DEFAULT_WIKIPEDIA_URLS` / `_DEFAULT_GUTENBERG_IDS` lists in `scripts/prepare_data.py`, or call `gather_data(wikipedia_urls=..., gutenberg_ids=...)` yourself, to use a different corpus.
+| Model | Val loss (nats) | Perplexity | Next-word accuracy |
+|---|---:|---:|---:|
+| Uniform random (knows nothing) | 9.39 | 11,966 | — |
+| Unigram (word frequencies only) | 6.38 | 590 | — |
+| **TinyGPT** | **5.05** | **155.6** | **19.87%** |
+
+- On average the model narrows the next word down to ~156 candidates, out of a vocabulary of 11,966.
+- It beats the unigram baseline by **1.33 nats**, a **3.8× lower perplexity**. A unigram model only knows how common each word is, so beating it shows the model is actually using context.
+- The top-1 prediction is exactly right for about 1 word in 5.
+
+![Training curves](assets/training_curves.png)
+
+**Limitations:** this is a learning project, not a usable LM. The corpus is tiny and narrow, the tokenizer is a simple word-level split (rare words become `<unk>`), and with this little data the model overfits easily, so early stopping keeps the checkpoint with the best validation loss.
 
 ## Setup
 
@@ -104,3 +114,7 @@ Open `notebooks/gpt_experiments.ipynb` and choose the **Python (tiny-gpt)** kern
 ```bash
 uv run pytest
 ```
+
+## License
+
+[MIT](LICENSE)
