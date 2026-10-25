@@ -1,5 +1,5 @@
 # Virtual environment
-llm_experiments/
+.venv/
 
 # Python
 __pycache__/
