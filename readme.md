@@ -1,6 +1,6 @@
-# small-gpt
+# tiny-gpt
 
-A small decoder-only transformer (GPT-style) language model implemented from scratch in PyTorch, as a learning exercise in how attention-based LLMs work end to end.
+A tiny decoder-only transformer (GPT-style) language model implemented from scratch in PyTorch, as a learning exercise in how attention-based LLMs work end to end.
 
 - **`attention.py`** — causal self-attention, positional encoding, and a minimal `TinyGPT` decoder stack built from first principles (no `nn.Transformer`).
 - **`data_gathering.py`** — pulls training text from Wikipedia articles and public-domain Project Gutenberg books, then tokenizes/vectorizes it into training sequences.
@@ -60,7 +60,7 @@ In most editors with a command palette (e.g. `Ctrl+Shift+P`), look for **Python:
 Register the venv as a Jupyter kernel:
 
 ```bash
-uv run python -m ipykernel install --user --name=small-gpt --display-name "Python (small-gpt)"
+uv run python -m ipykernel install --user --name=tiny-gpt --display-name "Python (tiny-gpt)"
 ```
 
-In a notebook, choose the **Python (small-gpt)** kernel.
+In a notebook, choose the **Python (tiny-gpt)** kernel.

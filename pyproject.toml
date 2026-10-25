@@ -1,7 +1,7 @@
 [project]
-name = "small-gpt"
+name = "tiny-gpt"
 version = "0.1.0"
-description = "A small decoder-only transformer (GPT-style) language model implemented from scratch in PyTorch."
+description = "A tiny decoder-only transformer (GPT-style) language model implemented from scratch in PyTorch."
 requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4==4.14.3",
