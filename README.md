@@ -39,8 +39,6 @@ Trained on ~600K word-level tokens from 23 Wikipedia articles and 7 public-domai
 - It beats the unigram baseline by **1.33 nats**, a **3.8× lower perplexity**. A unigram model only knows how common each word is, so beating it shows the model is actually using context.
 - The top-1 prediction is exactly right for about 1 word in 5.
 
-![Training curves](assets/training_curves.png)
-
 **Limitations:** this is a learning project, not a usable LM. The corpus is tiny and narrow, the tokenizer is a simple word-level split (rare words become `<unk>`), and with this little data the model overfits easily, so early stopping keeps the checkpoint with the best validation loss.
 
 ## Setup
