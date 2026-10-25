@@ -1,9 +1,11 @@
 import re
+from collections import Counter
+from pathlib import Path
+import time
+
 import requests
 import torch
 from bs4 import BeautifulSoup
-import re
-from collections import Counter
 
 
 def fetch_wikipedia_text(urls, verbose=True):
@@ -32,7 +34,7 @@ def fetch_wikipedia_text(urls, verbose=True):
 
         except Exception as e:
             print(f"  Failed {url}: {e}")
-
+        time.sleep(2)
     return " ".join(all_texts)
 
 
@@ -189,3 +191,12 @@ def format_data(text, seq_len=64, min_freq=3):
     print(f"<unk> rate : {tokens.count('<unk>') / len(tokens) * 100:.2f}%")
 
     return input_ids, target_ids, vocab, stoi, itos
+
+
+if __name__ == "__main__":
+    text = gather_data()
+
+    out_path = Path(__file__).resolve().parent.parent / "data" / "dog_corpus.txt"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(text, encoding="utf-8")
+    print(f"\nSaved {len(text):,} chars to {out_path}")
